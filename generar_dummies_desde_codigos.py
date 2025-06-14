@@ -101,8 +101,7 @@ def clean_label(label):
 # Procesar fechas si existe la columna Fecha
 if 'Fecha' in df.columns:
     print("Procesando fechas...")
-    
-    # Diccionario de meses en español
+      # Diccionario de meses en español
     meses = {
         'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
         'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
@@ -112,14 +111,37 @@ if 'Fecha' in df.columns:
         try:
             if pd.isna(fecha_str):
                 return None
-            partes = str(fecha_str).lower().strip().split(' de ')
-            if len(partes) == 2:
-                dia = int(partes[0])
-                mes = meses.get(partes[1], 1)
-                return datetime(2025, mes, dia)  # Forzando año 2025
-        except:
-            pass
-        return None
+                
+            # Normalizar texto
+            fecha_str = str(fecha_str).lower().strip()
+            
+            # Extraer partes principales (día y mes)
+            if ' de ' in fecha_str:
+                partes = fecha_str.split(' de ')
+                dia_str = partes[0].strip()
+                # Si hay más texto después del mes, ignorarlo
+                mes_texto = partes[1].strip().split()[0]
+            else:
+                return None
+            
+            # Extraer el número del día
+            import re
+            dia_match = re.search(r'\d+', dia_str)
+            if dia_match:
+                dia = int(dia_match.group())
+            else:
+                return None
+                
+            # Obtener el mes
+            mes = meses.get(mes_texto, None)
+            if mes is None:
+                return None
+                
+            # Todas las fechas se consideran de 2025
+            return datetime(2025, mes, dia)
+        except Exception as e:
+            print(f"Error procesando fecha '{fecha_str}': {e}")
+            return None
     
     # Crear columna de fecha convertida
     df['Fecha_convertida'] = df['Fecha'].apply(convertir_fecha)
