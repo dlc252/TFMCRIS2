@@ -2508,8 +2508,7 @@ def main():
     if resultados_plain_contexto and 'plain_folks_contexto' in resultados_plain_contexto:
         df_plain_contexto = resultados_plain_contexto['plain_folks_contexto']
         
-        if not df_plain_contexto.empty:
-            # Opciones de visualización
+        if not df_plain_contexto.empty:            # Opciones de visualización
             col_size6, col_download6 = st.columns([3, 1])
             
             with col_size6:
@@ -2518,6 +2517,20 @@ def main():
                     ["Normal", "Compacta", "Expandida"],
                     key="tamano_plain_contexto"
                 )
+                
+            with col_download6:
+                if st.button("📥 Exportar datos", use_container_width=True, key="download_plain_contexto"):
+                    excel_data = exportar_a_excel(
+                        {"Plain_Folks_Contexto": df_plain_contexto},
+                        "plain_folks_contexto"
+                    )
+                    st.download_button(
+                        label="📎 Descargar Excel",
+                        data=excel_data,
+                        file_name=f"plain_folks_contexto_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.ms-excel",
+                        use_container_width=True
+                    )
             
             # Mostrar tabla
             st.markdown("### 📊 Uso del recurso Plain-folks según contexto y campaña")
@@ -2589,8 +2602,7 @@ def main():
     if resultados_ipa and 'distribucion_ipa' in resultados_ipa:
         df_ipa = resultados_ipa['distribucion_ipa']
         
-        if not df_ipa.empty:
-            # Opciones de visualización
+        if not df_ipa.empty:            # Opciones de visualización
             col_size7, col_download7 = st.columns([3, 1])
             
             with col_size7:
@@ -2599,6 +2611,20 @@ def main():
                     ["Normal", "Compacta", "Expandida"],
                     key="tamano_ipa"
                 )
+                
+            with col_download7:
+                if st.button("📥 Exportar datos", use_container_width=True, key="download_ipa"):
+                    excel_data = exportar_a_excel(
+                        {"Distribucion_IPA": df_ipa},
+                        "distribucion_recursos_ipa"
+                    )
+                    st.download_button(
+                        label="📎 Descargar Excel",
+                        data=excel_data,
+                        file_name=f"distribucion_ipa_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.ms-excel",
+                        use_container_width=True
+                    )
             
             # Mostrar tabla
             st.markdown("### 📊 Distribución general de recursos de propaganda (IPA)")
@@ -2670,8 +2696,7 @@ def main():
     if resultados_cruce and 'cruce_reglas_contexto' in resultados_cruce:
         df_cruce = resultados_cruce['cruce_reglas_contexto']
         
-        if not df_cruce.empty:
-            # Opciones de visualización
+        if not df_cruce.empty:            # Opciones de visualización
             col_size8, col_download8 = st.columns([3, 1])
             
             with col_size8:
@@ -2680,6 +2705,20 @@ def main():
                     ["Normal", "Compacta", "Expandida"],
                     key="tamano_cruce"
                 )
+                
+            with col_download8:
+                if st.button("📥 Exportar datos", use_container_width=True, key="download_cruce"):
+                    excel_data = exportar_a_excel(
+                        {"Cruce_Reglas_Contexto": df_cruce},
+                        "cruce_reglas_contexto"
+                    )
+                    st.download_button(
+                        label="📎 Descargar Excel",
+                        data=excel_data,
+                        file_name=f"cruce_reglas_contexto_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.ms-excel",
+                        use_container_width=True
+                    )
             
             # Mostrar tabla
             st.markdown("### ✅ Cruce entre reglas de propaganda y contexto de la imagen")
@@ -2721,8 +2760,7 @@ def main():
     if resultados_lider and 'aparicion_lider' in resultados_lider:
         df_lider = resultados_lider['aparicion_lider']
         
-        if not df_lider.empty:
-            # Opciones de visualización
+        if not df_lider.empty:            # Opciones de visualización
             col_size9, col_download9 = st.columns([3, 1])
             
             with col_size9:
@@ -2731,6 +2769,20 @@ def main():
                     ["Normal", "Compacta", "Expandida"],
                     key="tamano_lider"
                 )
+                
+            with col_download9:
+                if st.button("📥 Exportar datos", use_container_width=True, key="download_lider"):
+                    excel_data = exportar_a_excel(
+                        {"Aparicion_Lider": df_lider},
+                        "aparicion_lider_contexto"
+                    )
+                    st.download_button(
+                        label="📎 Descargar Excel",
+                        data=excel_data,
+                        file_name=f"aparicion_lider_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.ms-excel",
+                        use_container_width=True
+                    )
             
             # Mostrar tabla
             st.markdown("### 📊 Aparición del líder según contexto y campaña")

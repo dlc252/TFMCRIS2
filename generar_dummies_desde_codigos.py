@@ -19,6 +19,14 @@ print(f"Dataset combinado: {len(df)} filas")
 
 # Diccionario de categorías
 category_mappings = {
+    "Contenido visual del post": {
+        "1": "Solo imagen",
+        "2": "Vídeo",
+        "3": "Sólo texto",
+        "4": "Combinación de imagen y texto",
+        "5": "Indeterminado",
+        "6": "Otro"
+    },
     "Formato del contenido": {
         "1": "Fotografía",
         "2": "Collage",
@@ -27,6 +35,11 @@ category_mappings = {
         "5": "Meme",
         "6": "Indeterminado",
         "7": "Otro"
+    },
+    "Aparición del líder": {
+        "1": "Sí",
+        "2": "No",
+        "3": "Indeterminado"
     },
     "Aparición de terceras personas": {
         "1": "Ninguna",
@@ -53,6 +66,12 @@ category_mappings = {
         "3": "Música del partido",
         "4": "Color corporativo",
         "5": "Indeterminado"
+    },
+    "Tipo de propaganda": {
+        "1": "Propaganda de afirmación",
+        "2": "Propaganda de negación",
+        "3": "Propaganda de reacción",
+        "4": "Indeterminado"
     },
     "Recursos de propaganda según el Institute for propaganda": {
         "1": "Name-calling (Improperios)",
