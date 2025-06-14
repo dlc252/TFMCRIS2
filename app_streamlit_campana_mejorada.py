@@ -10,6 +10,11 @@ from datetime import datetime, timedelta
 import io
 import base64
 from scipy.stats import chi2_contingency
+from docx import Document
+from docx.shared import Inches, Pt
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.shared import OxmlElement, qn
 
 # =====================================================
 # CONFIGURACIÓN VISUAL Y FORMATO APA
@@ -164,27 +169,34 @@ def obtener_categorias_de_variable(dummy_cols, variable_principal):
             categorias.append((col, categoria))
     return categorias
 
-def filtrar_datos_por_seleccion(df, dummy_cols, variable_seleccionada=None, categoria_seleccionada=None):
-    """Filtra el DataFrame según la selección de variable/categoría"""
+def filtrar_datos_por_seleccion(df, dummy_cols, variable_seleccionada=None, categorias_seleccionadas=None):
+    """Filtra el DataFrame según la selección de variable/categorías (múltiples)"""
     if variable_seleccionada == "Todas las variables" or variable_seleccionada is None:
         return df, dummy_cols
     
     # Filtrar columnas dummy de la variable seleccionada
-    if categoria_seleccionada == "Todas las categorías" or categoria_seleccionada is None:
+    if not categorias_seleccionadas or "Todas las categorías" in categorias_seleccionadas:
         cols_filtradas = [col for col in dummy_cols if col.split('__')[0] == variable_seleccionada]
+        df_filtrado = df.copy()
     else:
-        cols_filtradas = [col for col in dummy_cols 
-                         if col.split('__')[0] == variable_seleccionada and col.split('__')[1] == categoria_seleccionada]
-    
-    # Si se seleccionó una categoría específica, filtrar filas donde esa categoría = 1
-    if categoria_seleccionada and categoria_seleccionada != "Todas las categorías":
-        col_especifica = f"{variable_seleccionada}__{categoria_seleccionada}"
-        if col_especifica in df.columns:
-            df_filtrado = df[df[col_especifica] == 1].copy()
+        # Selecciones múltiples específicas
+        cols_filtradas = []
+        condiciones = []
+        
+        for categoria in categorias_seleccionadas:
+            col_especifica = f"{variable_seleccionada}__{categoria}"
+            if col_especifica in df.columns:
+                cols_filtradas.append(col_especifica)
+                condiciones.append(df[col_especifica] == 1)
+        
+        # Combinar condiciones con OR (al menos una categoría debe ser verdadera)
+        if condiciones:
+            condicion_final = condiciones[0]
+            for condicion in condiciones[1:]:
+                condicion_final = condicion_final | condicion
+            df_filtrado = df[condicion_final].copy()
         else:
             df_filtrado = df.copy()
-    else:
-        df_filtrado = df.copy()
     
     return df_filtrado, cols_filtradas
 
@@ -426,6 +438,263 @@ def analisis_plain_folks(df, dummy_cols, variable_seleccionada=None, formato_apa
     return resultados
 
 # =====================================================
+# FUNCIONES PARA MODO CLARO/OSCURO Y EXPORTACIÓN
+# =====================================================
+
+def aplicar_tema(tema="claro"):
+    """Aplica tema claro u oscuro para las visualizaciones"""
+    if tema == "oscuro":
+        plt.style.use('dark_background')
+        plt.rcParams.update({
+            'axes.facecolor': '#2e2e2e',
+            'figure.facecolor': '#1e1e1e',
+            'text.color': 'white',
+            'axes.labelcolor': 'white',
+            'xtick.color': 'white',
+            'ytick.color': 'white',
+            'axes.edgecolor': 'white',
+            'grid.color': '#404040'
+        })
+        return True
+    else:
+        # Modo claro - APA estándar
+        plt.style.use('default')
+        plt.rcParams.update({
+            'font.family': 'serif',
+            'font.serif': ['Times New Roman', 'DejaVu Serif', 'serif'],
+            'font.size': 12,
+            'axes.titlesize': 14,
+            'axes.labelsize': 12,
+            'xtick.labelsize': 11,
+            'ytick.labelsize': 11,
+            'legend.fontsize': 11,
+            'figure.titlesize': 16,
+            'axes.spines.top': False,
+            'axes.spines.right': False,
+            'axes.spines.left': True,
+            'axes.spines.bottom': True,
+            'axes.linewidth': 1.0,
+            'axes.edgecolor': 'black',
+            'axes.facecolor': 'white',
+            'figure.facecolor': 'white',
+            'axes.grid': True,
+            'grid.alpha': 0.3,
+            'grid.linewidth': 0.5,
+            'grid.color': 'gray',
+            'figure.figsize': (10, 6),
+            'figure.dpi': 300,
+            'savefig.dpi': 300,
+            'savefig.bbox': 'tight',
+            'savefig.facecolor': 'white',
+        })
+        return False
+
+def crear_tabla_apa_docx(doc, df, titulo="Tabla"):
+    """Crea una tabla en formato APA para documento DOCX"""
+    # Agregar título de tabla
+    titulo_para = doc.add_paragraph()
+    titulo_run = titulo_para.add_run(titulo)
+    titulo_run.font.name = 'Times New Roman'
+    titulo_run.font.size = Pt(12)
+    titulo_run.bold = True
+    titulo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    
+    # Crear tabla
+    table = doc.add_table(rows=1, cols=len(df.columns))
+    table.style = 'Light Grid Accent 1'
+    
+    # Configurar encabezados
+    hdr_cells = table.rows[0].cells
+    for i, column in enumerate(df.columns):
+        hdr_cells[i].text = str(column)
+        for paragraph in hdr_cells[i].paragraphs:
+            for run in paragraph.runs:
+                run.font.name = 'Times New Roman'
+                run.font.size = Pt(12)
+                run.bold = True
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # Agregar datos
+    for index, row in df.iterrows():
+        row_cells = table.add_row().cells
+        for i, value in enumerate(row):
+            row_cells[i].text = str(value)
+            for paragraph in row_cells[i].paragraphs:
+                for run in paragraph.runs:
+                    run.font.name = 'Times New Roman'
+                    run.font.size = Pt(12)
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # Aplicar bordes APA
+    for row in table.rows:
+        for cell in row.cells:
+            cell.width = Inches(1.5)
+    
+    doc.add_paragraph()  # Espacio después de la tabla
+    return table
+
+def exportar_a_docx(dataframes_dict, graficos_dict=None, titulo_documento="Análisis de Campaña Electoral"):
+    """Exporta tablas y gráficos a un documento DOCX en formato APA"""
+    doc = Document()
+    
+    # Configurar documento
+    section = doc.sections[0]
+    section.page_height = Inches(11)
+    section.page_width = Inches(8.5)
+    section.left_margin = Inches(1)
+    section.right_margin = Inches(1)
+    section.top_margin = Inches(1)
+    section.bottom_margin = Inches(1)
+    
+    # Título principal
+    titulo = doc.add_heading(titulo_documento, 0)
+    titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for run in titulo.runs:
+        run.font.name = 'Times New Roman'
+        run.font.size = Pt(16)
+    
+    # Fecha
+    fecha_para = doc.add_paragraph()
+    fecha_run = fecha_para.add_run(f"Fecha de análisis: {datetime.now().strftime('%d de %B de %Y')}")
+    fecha_run.font.name = 'Times New Roman'
+    fecha_run.font.size = Pt(12)
+    fecha_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    doc.add_paragraph()  # Espacio
+    
+    # Agregar tablas
+    for i, (nombre, df) in enumerate(dataframes_dict.items(), 1):
+        if not df.empty:
+            titulo_tabla = f"Tabla {i}. {nombre}"
+            crear_tabla_apa_docx(doc, df, titulo_tabla)
+    
+    # Guardar en memoria
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+def obtener_css_tema(tema_oscuro=False):
+    """Genera CSS personalizado según el tema seleccionado"""
+    if tema_oscuro:
+        return """
+        <style>
+            .stApp {
+                background-color: #1e1e1e;
+                color: white;
+            }
+            .main-header {
+                font-size: 2.5rem;
+                font-weight: bold;
+                color: #4dabf7;
+                text-align: center;
+                margin-bottom: 2rem;
+            }
+            .section-header {
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: #74c0fc;
+                margin-top: 2rem;
+                margin-bottom: 1rem;
+                border-bottom: 2px solid #364fc7;
+                padding-bottom: 0.5rem;
+            }
+            .metric-card {
+                background-color: #2c2c2c;
+                padding: 1rem;
+                border-radius: 10px;
+                border-left: 4px solid #4dabf7;
+                margin: 0.5rem 0;
+            }
+            .apa-table {
+                font-family: 'Times New Roman', serif;
+                font-size: 12px;
+                background-color: #2c2c2c;
+                color: white;
+                border-collapse: collapse;
+            }
+            .apa-table th {
+                border-top: 2px solid white;
+                border-bottom: 1px solid white;
+                padding: 8px;
+                text-align: center;
+                font-weight: bold;
+                background-color: #404040;
+            }
+            .apa-table td {
+                padding: 6px;
+                text-align: center;
+                border-bottom: none;
+            }
+            .apa-table .final-row td {
+                border-bottom: 1px solid white;
+            }
+        </style>
+        """
+    else:
+        return """
+        <style>
+            .main-header {
+                font-size: 2.5rem;
+                font-weight: bold;
+                color: #1f77b4;
+                text-align: center;
+                margin-bottom: 2rem;
+            }
+            .section-header {
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: #2e86ab;
+                margin-top: 2rem;
+                margin-bottom: 1rem;
+                border-bottom: 2px solid #e6f3ff;
+                padding-bottom: 0.5rem;
+            }
+            .metric-card {
+                background-color: #f8f9fa;
+                padding: 1rem;
+                border-radius: 10px;
+                border-left: 4px solid #1f77b4;
+                margin: 0.5rem 0;
+            }
+            .stDataFrame {
+                border: 1px solid #e6e6e6;
+                border-radius: 5px;
+            }
+            .apa-table {
+                font-family: 'Times New Roman', serif;
+                font-size: 12px;
+                background-color: white;
+                border-collapse: collapse;
+            }
+            .apa-table th {
+                border-top: 2px solid black;
+                border-bottom: 1px solid black;
+                padding: 8px;
+                text-align: center;
+                font-weight: bold;
+            }
+            .apa-table td {
+                padding: 6px;
+                text-align: center;
+                border-bottom: none;
+            }
+            .apa-table .final-row td {
+                border-bottom: 1px solid black;
+            }
+            .download-button {
+                background-color: #28a745;
+                color: white;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 5px;
+                cursor: pointer;
+                margin: 0.5rem 0;
+            }
+        </style>
+        """
+
+# =====================================================
 # FUNCIÓN PRINCIPAL
 # =====================================================
 
@@ -445,8 +714,7 @@ def main():
         st.error("❌ No se pudieron cargar los datos o no se encontraron columnas dummy.")
         st.info("Asegúrate de que el archivo 'recodificado.xlsx' esté en el directorio correcto.")
         return
-    
-    # =====================================================
+      # =====================================================
     # CONFIGURACIÓN GLOBAL EN SIDEBAR
     # =====================================================
     
@@ -459,6 +727,19 @@ def main():
         help="Activa el formato de tablas según estándares APA para publicaciones académicas"
     )
     
+    # Toggle para modo oscuro
+    modo_oscuro = st.sidebar.checkbox(
+        "🌙 Modo oscuro",
+        value=False,
+        help="Activa el modo oscuro para visualizaciones (no compatible con exportación APA)"
+    )
+    
+    # Aplicar tema
+    tema_aplicado = aplicar_tema("oscuro" if modo_oscuro else "claro")
+    
+    # Aplicar CSS según el tema
+    st.markdown(obtener_css_tema(modo_oscuro), unsafe_allow_html=True)
+    
     # Selección de variable principal
     variables_principales = obtener_variables_principales(dummy_cols)
     variable_seleccionada = st.sidebar.selectbox(
@@ -467,24 +748,31 @@ def main():
         help="Selecciona una variable específica para análisis univariado"
     )
     
-    # Selección de categoría (si se seleccionó una variable específica)
-    categoria_seleccionada = None
+    # Selección múltiple de categorías (si se seleccionó una variable específica)
+    categorias_seleccionadas = []
     if variable_seleccionada != "Todas las variables":
         categorias_disponibles = obtener_categorias_de_variable(dummy_cols, variable_seleccionada)
         if categorias_disponibles:
-            nombres_categorias = ["Todas las categorías"] + [cat[1].replace('_', ' ').title() for cat in categorias_disponibles]
-            categoria_display = st.sidebar.selectbox(
-                f"📂 Categoría de {variable_seleccionada.replace('_', ' ').title()}:",
-                nombres_categorias,
-                help="Selecciona una categoría específica para análisis más granular"
+            nombres_categorias = [cat[1].replace('_', ' ').title() for cat in categorias_disponibles]
+            
+            # Usar multiselect para selección múltiple
+            categorias_display = st.sidebar.multiselect(
+                f"📂 Categorías de {variable_seleccionada.replace('_', ' ').title()}:",
+                options=nombres_categorias,
+                default=[],
+                help="Selecciona una o múltiples categorías para análisis. Si no seleccionas ninguna, se incluirán todas."
             )
             
-            if categoria_display != "Todas las categorías":
-                # Encontrar la categoría original
-                for cat_orig, cat_display in categorias_disponibles:
-                    if cat_display.replace('_', ' ').title() == categoria_display:
-                        categoria_seleccionada = cat_display
-                        break
+            if categorias_display:
+                # Convertir nombres display a nombres originales
+                for cat_display in categorias_display:
+                    for cat_orig, cat_orig_name in categorias_disponibles:
+                        if cat_orig_name.replace('_', ' ').title() == cat_display:
+                            categorias_seleccionadas.append(cat_orig_name)
+                            break
+            else:
+                # Si no se selecciona nada, incluir todas las categorías
+                categorias_seleccionadas = ["Todas las categorías"]
     
     # Filtros adicionales
     st.sidebar.header("🔧 Filtros Adicionales")
@@ -523,10 +811,9 @@ def main():
             (df_filtrado['Fecha_convertida'].dt.date >= fecha_inicio) &
             (df_filtrado['Fecha_convertida'].dt.date <= fecha_fin)
         ]
-    
-    # Aplicar filtro de variable/categoría
+      # Aplicar filtro de variable/categoría
     df_filtrado, dummy_cols_filtradas = filtrar_datos_por_seleccion(
-        df_filtrado, dummy_cols, variable_seleccionada, categoria_seleccionada
+        df_filtrado, dummy_cols, variable_seleccionada, categorias_seleccionadas
     )
     
     # Mostrar información de filtros aplicados
@@ -536,8 +823,9 @@ def main():
     
     if variable_seleccionada != "Todas las variables":
         st.sidebar.info(f"🎯 **Análisis enfocado en:** {variable_seleccionada.replace('_', ' ').title()}")
-        if categoria_seleccionada:
-            st.sidebar.info(f"📂 **Categoría:** {categoria_seleccionada.replace('_', ' ').title()}")
+        if categorias_seleccionadas and "Todas las categorías" not in categorias_seleccionadas:
+            categorias_text = ", ".join([cat.replace('_', ' ').title() for cat in categorias_seleccionadas])
+            st.sidebar.info(f"📂 **Categorías:** {categorias_text}")
     
     if formato_apa:
         st.sidebar.success("📋 Formato APA activo")
@@ -903,10 +1191,62 @@ def main():
             )
         else:
             st.warning("No hay datos para exportar.")
-
-# =====================================================
-# EJECUTAR LA APLICACIÓN
-# =====================================================
+    
+    # Sección para exportación DOCX en formato APA
+    st.markdown("---")
+    st.markdown("### 📄 Exportación en Formato APA (DOCX)")
+    
+    col_docx1, col_docx2 = st.columns(2)
+    
+    with col_docx1:
+        if st.button("📄 Exportar Tablas APA (DOCX)", use_container_width=True):
+            # Solo exportar si el modo claro está activado (para mantener estándares APA)
+            if not modo_oscuro:
+                dataframes_apa = {}
+                
+                # Recopilar todas las tablas disponibles
+                if 'df_top' in locals() and len(df_top) > 0:
+                    dataframes_apa["Top Categorías de Estrategias"] = df_top
+                
+                if 'tabla' in locals() and tabla is not None:
+                    dataframes_apa["Tabla de Contingencia"] = tabla
+                    dataframes_apa["Tabla de Porcentajes"] = tabla_pct
+                
+                if 'datos_propaganda' in locals() and datos_propaganda is not None:
+                    dataframes_apa["Análisis por Candidato"] = datos_propaganda
+                
+                if 'df_temporal' in locals() and len(df_temporal) > 0:
+                    dataframes_apa["Evolución Temporal"] = df_temporal
+                
+                if 'df_plain_cand' in locals() and len(df_plain_cand) > 0:
+                    dataframes_apa["Análisis Plain Folks por Candidato"] = df_plain_cand
+                
+                if dataframes_apa:
+                    # Generar documento DOCX
+                    titulo_doc = f"Análisis de Campaña Electoral - {variable_seleccionada.replace('_', ' ').title() if variable_seleccionada != 'Todas las variables' else 'Análisis Completo'}"
+                    docx_buffer = exportar_a_docx(dataframes_apa, titulo_documento=titulo_doc)
+                    
+                    st.download_button(
+                        label="📄 Descargar Documento APA (DOCX)",
+                        data=docx_buffer,
+                        file_name=f"analisis_campana_apa_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+                else:
+                    st.warning("No hay tablas disponibles para exportar.")
+            else:
+                st.warning("⚠️ La exportación APA requiere modo claro. Desactiva el modo oscuro para exportar en formato académico.")
+    
+    with col_docx2:
+        st.info("""
+        **📋 Características del formato APA:**
+        - Tablas con formato académico estándar
+        - Fuente Times New Roman 12pt
+        - Bordes y espaciado según normas APA
+        - Títulos numerados automáticamente
+        - Fecha del análisis incluida
+        - Compatible con editores de texto académicos
+        """)
 
 if __name__ == "__main__":
     main()

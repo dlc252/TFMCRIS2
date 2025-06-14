@@ -8,7 +8,7 @@ pip install -r requirements.txt
 
 Write-Host "✅ Instalación completada!" -ForegroundColor Green
 Write-Host "🚀 Para ejecutar la app, usa el comando:" -ForegroundColor Yellow
-Write-Host "streamlit run app_streamlit_campana.py" -ForegroundColor Cyan
+Write-Host "streamlit run app_streamlit_campana_mejorada.py" -ForegroundColor Cyan
 
 # Pausa para ver el resultado
 Read-Host "Presiona Enter para continuar..."
